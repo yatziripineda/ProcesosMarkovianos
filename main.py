@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 import numpy as np
-
+from scipy.optimize import linprog
 
 
 # Clase principal de la aplicación
@@ -35,7 +35,9 @@ class App:
         read_data_btn = tk.Button(self.root, text="Enumeracion exhaustiva de políticas", command=self.pedir_politicas)
         read_data_btn.pack(pady=10)
         
-        
+        # Botón para el algoritmo de programacion lineal
+        btn_ppl = tk.Button(self.root, text="Programación Lineal (PPL)", command=self.resolver_ppl)
+        btn_ppl.pack(pady=10)
 
         # Botón para salir
         exit_btn = tk.Button(self.root, text="Salir", command=self.root.quit)
@@ -333,9 +335,123 @@ class App:
             [0, 6000,  6000, 6000]     # Decisión 3
         ]
         messagebox.showinfo("Datos cargados", "Se cargaron los datos de ejemplo correctamente.\nPuedes ejecutar los algoritmos.")
+    
 
+    def resolver_ppl(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        tk.Label(self.root, text="Resolviendo con Programación Lineal", font=("Arial", 16)).pack(pady=10)
+
+        #Iniciaización de variables
+        n = self.n_estados
+        m = self.n_decisiones
+        total_vars = n * m
+
+        C = []      # Costos Cik
+        A_eq = []   # Matriz de restricciones de igualdad
+        b_eq = []   # Vector del lado derecho
+        bounds = [(0, None)] * total_vars  # y_ik ≥ 0
+
+        # Creamos vector de costos C
+        for i in range(n):
+            for k in range(m):
+                C.append(self.Cik[k][i])
+
+        # Restricción 1: suma de todas las y_ik = 1
+        A_eq.append([1.0] * total_vars)
+        b_eq.append(1.0)
+
+        # Demás restricciones -> para cada estado j
+        for j in range(n):
+            fila = [0.0] * total_vars
+            for i in range(n):
+                for k in range(m):
+                    index = i * m + k
+                    pij = self.Pij[k][i][j]
+                    if i == j:
+                        fila[index] += -1 + pij
+                    else:
+                        fila[index] += pij
+            A_eq.append(fila)
+            b_eq.append(0.0)
+#-----------------
+        # Mostrar modelo de programación lineal (PPL)
+        tk.Label(self.root, text="Modelo de Programación Lineal", font=("Arial", 14, "bold")).pack(pady=5)
+        frame_modelo = tk.Frame(self.root)
+        frame_modelo.pack(pady=5)
+
+        # Función objetivo
+        z_texto = "Min z = "
+        for i in range(n):
+            for k in range(m):
+                coef = round(self.Cik[k][i], 2)
+                z_texto += f"{coef}·y_{i}{k} + "
+        z_texto = z_texto[:-3]
+        tk.Label(frame_modelo, text=z_texto, font=("Courier", 10), anchor="w", justify="left").pack(anchor="w")
+
+        # Restricción de suma total de probabilidades
+        rest1 = "∑ y_ik = 1 → " + " + ".join([f"y_{i}{k}" for i in range(n) for k in range(m)])
+        tk.Label(frame_modelo, text=rest1, font=("Courier", 10), anchor="w", justify="left").pack(anchor="w")
+
+        # Restricciones de balance (omitiendo último estado)
+        for j in range(n - 1):  # IMPORTANTE: solo hasta n-1
+            lhs = ""
+            for i in range(n):
+                for k in range(m):
+                    pij = self.Pij[k][i][j]
+                    if pij != 0:
+                        coef = round(pij, 3)
+                        lhs += f"{coef}·y_{i}{k} + "
+            lhs = lhs[:-3] if lhs else "0"
+            ecuacion = f"Estado {j}: {lhs} = y_{j}*"
+            tk.Label(frame_modelo, text=ecuacion, font=("Courier", 10), anchor="w", justify="left").pack(anchor="w")
+
+
+#---------------------
+        # Resolver con scipy.optimize.linprog
+        resultado = linprog(C, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method='highs')
+
+        if resultado.success:
+            y_vars = resultado.x
+            costo_optimo = resultado.fun
+
+            # Mostrar el costo óptimo
+            tk.Label(self.root, text=f"Costo óptimo total: {round(costo_optimo, 4)}", font=("Arial", 14)).pack(pady=10)
+
+            # Mostrar valores de las variables básicas
+            frame = tk.Frame(self.root)
+            frame.pack()
+            tk.Label(frame, text="Valor de las variables  (y_ik):", font=("Arial", 12, "bold")).pack()
+
+            texto = ""
+            politica_optima = []
+
+            for i in range(n):
+                mejor_k = -1
+                valor_max = 0
+                fila = f"Estado {i}: "
+                for k in range(m):
+                    idx = i * m + k
+                    y_val = round(y_vars[idx], 4)
+                    fila += f" y_{i}{k}={y_val}   "
+                    if y_val > valor_max:
+                        valor_max = y_val
+                        mejor_k = k
+                politica_optima.append(mejor_k + 1)
+                texto += fila + "\n"
+
+            tk.Label(frame, text=texto, font=("Courier", 10), justify="left", anchor="w").pack()
+
+            # Mostrar política óptima
+            poli_txt = ", ".join([str(p) for p in politica_optima])
+            tk.Label(self.root, text=f"Política óptima : [{poli_txt}]", font=("Arial", 14, "bold")).pack(pady=10)
+        else:
+            tk.Label(self.root, text="No se pudo encontrar una solución", fg="red", font=("Arial", 14)).pack()
+
+        # Botón para volver
+        tk.Button(self.root, text="Volver al menú", command=self.inicio).pack(pady=10)
             
-        
 
 # Punto de entrada principal
 if __name__ == "__main__":
