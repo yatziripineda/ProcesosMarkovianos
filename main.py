@@ -1,56 +1,100 @@
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox, simpledialog, PhotoImage, Menu
 import numpy as np
 from scipy.optimize import linprog
+import tkinter.font as tkfont
+from tkinter import ttk
+
 
 
 # Clase principal de la aplicación
 class App:
     def __init__(self, root):
-        self.politicas_usuario = []
-        self.root = root  # Guarda la ventana principal (root) que nos dieron como argumento, dentro del objeto (self) para poder usarla más adelante
-        self.root.title("Procesos de Decisión de Markov")  # Título de la ventana
-        self.root.geometry("700x500")  # Tamaño de la ventana
+        self.root = root
+        self.root.title("Procesos de Decisión de Markov")
+        self.root.geometry("1000x800")
+        self.root.configure(bg="#DCDAD6")
+
+        # --- Estilos ttk ---
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+        self.style.configure('TLabelFrame', background='#DCDAD6', borderwidth=2, relief='groove')
+        self.style.configure('TButton', font=('Helvetica', 18), padding=6)
+        self.style.configure('Header.TLabel', font=('Arial', 20, 'bold'), background='#DCDAD6')
+        self.style.configure('Status.TLabel', relief='sunken', anchor='w')
+
+        # --- Fuente para título ---
+        self.title_font = tkfont.Font(family="Arial", size=24, weight="bold")
+
+        
+
+        # --- Barra de estado ---
+        self.status_var = tk.StringVar(value="Listo")
+        status_bar = ttk.Label(self.root, textvariable=self.status_var, style='Status.TLabel')
+        status_bar.pack(side='bottom', fill='x')
 
         self.inicio()
+           
 
     def inicio(self):
-        # Limpia la pantalla si hay widgets anteriores
-        for widget in self.root.winfo_children():  # Te da todos los widgets (botones, etiquetas, etc.) que están en la ventana principal
-            widget.destroy()
+        # Limpia todo
+        for widget in self.root.winfo_children():
+            if not isinstance(widget, ttk.Label):  # preserva la barra de estado
+                widget.destroy()
 
-        # Etiqueta de bienvenida
-        label = tk.Label(self.root, text="Procesos Estocásticos: Procesos Markovianos de Decisión", font=("Arial", 16))
-        label.pack(pady=20)
+        # --- Encabezado con ícono y título ---
+        header = ttk.Frame(self.root, padding=10, style='TFrame')
+        header.pack(fill='x')
+        try:
+            icon = PhotoImage(file="icon.png")
+            lbl_icon = ttk.Label(header, image=icon, background='#f5cac3')
+            lbl_icon.image = icon
+            lbl_icon.pack(side='left', padx=5)
+        except Exception:
+            pass  # si falta el icono, simplemente no lo muestra
+        lbl_title = ttk.Label(header,
+                              text="Procesos Estocásticos: Markovianos de Decisión",
+                              style='Header.TLabel')
+        lbl_title.pack(side='top', padx=20)
 
-        # Botón para ir al menú de lectura de datos
-        read_data_btn = tk.Button(self.root, text="Leer datos", width=30, command=self.abrir_lectura_datos)
-        read_data_btn.pack(pady=10)
-        
-        btn_ejemplo = tk.Button(self.root, text="Cargar ejemplo de datos", width=30, command=self.cargar_ejemplo_datos)
-        btn_ejemplo.pack(pady=10)
-        btn_ejemplo = tk.Button(self.root, text="Cargar ejemplo de datos de la tarea", width=30, command=self.cargar_ejemplo_datos_Tarea)
-        btn_ejemplo.pack(pady=10)
-        btn_ejemplo = tk.Button(self.root, text="Mostrar datos", width=30, command=self.mostrar_datos_ingresados)
-        btn_ejemplo.pack(pady=10)
+        # --- Sección: Lectura de datos ---
+        data_frame = ttk.LabelFrame(self.root, text="Lectura de datos", padding=10)
+        data_frame.pack(padx=20, pady=10, fill='x')
+        ttk.Button(data_frame, text="Leer datos", width=20, command=self.abrir_lectura_datos)\
+            .pack(side='left', padx=5, pady=5)
+        ttk.Button(data_frame, text="Cargar ejemplo", width=20, command=self.cargar_ejemplo_datos)\
+            .pack(side='left', padx=5, pady=5)
+        ttk.Button(data_frame, text="Ejemplo de tarea", width=20, command=self.cargar_ejemplo_datos_Tarea)\
+            .pack(side='left', padx=5, pady=5)
+        ttk.Button(data_frame, text="Mostrar datos", width=20, command=self.mostrar_datos_ingresados)\
+            .pack(side='left', padx=5, pady=5)
 
-        
+        # --- Sección: Algoritmos disponibles ---
+        algo_frame = ttk.LabelFrame(self.root, text="Algoritmos", padding=10)
+        algo_frame.pack(padx=20, pady=10, fill='x')
+        ttk.Button(algo_frame,
+                   text="Enumeración exhaustiva",
+                   width=25,
+                   command=self.pedir_politicas)\
+            .pack(side='top', fill='x', pady=3)
+        ttk.Button(algo_frame,
+                   text="Mejoramiento de políticas",
+                   width=25,
+                   command=self.metodo_mejoramiento_politicas)\
+            .pack(side='top', fill='x', pady=3)
+        ttk.Button(algo_frame,
+                   text="Programación Lineal (PPL)",
+                   width=25,
+                   command=self.resolver_ppl)\
+            .pack(side='top', fill='x', pady=3)
 
-        # Botón para El algoritmo de Enumeracion exhaustiva de políticas
-        read_data_btn = tk.Button(self.root, text="Enumeracion exhaustiva de políticas", width=30, command=self.pedir_politicas)
-        read_data_btn.pack(pady=10)
+        # --- Botón de salir destacado ---
+        exit_btn = ttk.Button(self.root, text="Salir", width=30, command=self.root.quit)
+        exit_btn.pack(pady=20)
 
-        #Botón para mejoramiento de políticas
-        tk.Button(self.root, text="Mejoramiento de políticas", width=30, command=self.metodo_mejoramiento_politicas).pack(pady=5)
-        
+        # Actualiza barra de estado
+        self.status_var.set("Vista de inicio cargada")
 
-        # Botón para el algoritmo de programacion lineal
-        btn_ppl = tk.Button(self.root, text="Programación Lineal (PPL)", command=self.resolver_ppl)
-        btn_ppl.pack(pady=10)
-
-        # Botón para salir
-        tk.Button(self.root, text="Salir", width=30, command=self.root.quit).pack(pady=10)
-        
         
 
     def abrir_lectura_datos(self):
@@ -58,29 +102,46 @@ class App:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        # Título
-        titulo = tk.Label(self.root, text="Ingreso de datos", font=("Arial", 16))
-        titulo.pack(pady=10)
+        # 2) header
+        header = ttk.Frame(self.root, padding=10)
+        header.pack(fill='x')
+        ttk.Label(header, text="Ingreso de datos", style='Header.TLabel').pack()
 
-        # Entrada: número de estados
-        label_estados = tk.Label(self.root, text="Ingresa el número de estados:")
-        label_estados.pack()
-        self.entry_estados = tk.Entry(self.root)  # Caja de texto donde se guarda el número de estados
-        self.entry_estados.pack(pady=5)
+        # 3) cuadro de inputs
+        input_frame = ttk.LabelFrame(self.root, text="Parámetros de lectura", padding=10)
+        input_frame.pack(padx=20, pady=10, fill='x')
+        ttk.Label(input_frame, text="Número de estados:").grid(row=0, column=0, sticky='w')
+        self.entry_estados = ttk.Entry(input_frame)
+        self.entry_estados.grid(row=0, column=1, sticky='ew', pady=5)
+        ttk.Label(input_frame, text="Número de decisiones:").grid(row=1, column=0, sticky='w')
+        self.entry_decisiones = ttk.Entry(input_frame)
+        self.entry_decisiones.grid(row=1, column=1, sticky='ew', pady=5)
+        input_frame.columnconfigure(1, weight=1)
 
-        # Entrada: número de decisiones
-        label_decisiones = tk.Label(self.root, text="Ingresa el número de decisiones:")
-        label_decisiones.pack()
-        self.entry_decisiones = tk.Entry(self.root)  # Caja de texto donde se guarda el número de decisiones
-        self.entry_decisiones.pack(pady=5)
+        
+        
+        # botones centrados
+        btn_frame = ttk.Frame(self.root, padding=50)
+        btn_frame.pack(fill='x')
+        inner = ttk.Frame(btn_frame)
+        inner.pack()
 
-        # Botón continuar
-        continuar_btn = tk.Button(self.root, text="Continuar", command=self.iniciar_llenado)
-        continuar_btn.pack(pady=10)
+        ttk.Button(
+            inner,
+            text="Continuar",
+            style='Azul.TButton',
+            command= self.iniciar_llenado
+        ).pack(side='left', padx=10)
+        ttk.Button(
+            inner,
+            text="Volver al menú",
+            style='Azul.TButton',
+            command=self.inicio
+        ).pack(side='left', padx=10)
 
-        # Botón regresar
-        regresar_btn = tk.Button(self.root, text="Volver al menú", command=self.inicio)
-        regresar_btn.pack(pady=5)
+        # 5) actualiza estado
+        self.status_var.set("Ingrese estados y decisiones")
+    
 
     def iniciar_llenado(self):
         
@@ -110,51 +171,110 @@ class App:
         self.k_actual = 0  # Empezamos por la decisión 0
         self.llenar_decision(self.k_actual)
 
+
+
     def llenar_decision(self, k):
         # Limpiamos la pantalla
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        # Etiqueta con número de decisión
-        tk.Label(self.root, text=f"Decisión {k + 1} de {self.n_decisiones}, matriz Pij:", font=("Arial", 30)).pack(pady=30)
+        # Etiqueta con número de decisión (estilo)
+        tk.Label(
+            self.root,
+            text=f"Decisión {k + 1} de {self.n_decisiones}, matriz Pij:",
+            font=("Arial", 30, "bold")
+            ,bg= '#DCDAD6'
+        ).pack(pady=30)
 
         self.entry_pij = []  # Lista de listas de Entry para probabilidades
         self.entry_cik = []  # Lista de Entry para costos
 
-        frame = tk.Frame(self.root)
-        frame.pack()
+        frame = tk.Frame(self.root,bg= '#DCDAD6')
+        frame.pack(padx=20, pady=10)
 
-        # Encabezado: columnas con estados destino
-        tk.Label(frame,text="Estado inicial\\destino").grid(row=0,column=0)  # Espacio vacío en esquina
+        # Encabezado: columnas con estados destino (estilo)
+        tk.Label(
+            frame,
+            text="Estado Inicial \\ Destino",
+            font=("Helvetica", 12, "bold"),
+            bg= '#DCDAD6'
+        ).grid(row=0, column=0, padx=5, pady=5)
+
         for j in range(self.n_estados):
-            tk.Label(frame, text=f" {j}").grid(row=0, column=j + 1, padx=20)
-        tk.Label(frame, text="Costo").grid(row=0, column=self.n_estados + 3)
-        
+            tk.Label(
+                frame,
+                text=f"{j}",
+                font=("Helvetica", 12),
+                bg= '#DCDAD6'
+            ).grid(row=0, column=j + 1, padx=15, pady=5)
+
+        tk.Label(
+            frame,
+            text="Costo",
+            font=("Helvetica", 12, "bold"),
+            bg= '#DCDAD6'
+        ).grid(row=0, column=self.n_estados + 3, padx=5, pady=5)
+
         # Sección para ingresar Pij y Cik
         for i in range(self.n_estados):
             fila = []
-            fila_fisica = i + 1  # porque la fila 0 ahora está ocupada por los encabezados
+            fila_fisica = i + 1
 
-            tk.Label(frame, text=f"{i}").grid(row=fila_fisica, column=0, padx=5) #Muestra una etiqueta como “Estado 0 → Pij:” en la primera columna (columna 0) y en la fila i.
+            tk.Label(
+                frame,
+                text=f"{i}",
+                font=("Helvetica", 12),
+                bg= '#DCDAD6'
+            ).grid(row=fila_fisica, column=0, padx=5, pady=5)
+
             for j in range(self.n_estados):
-                e = tk.Entry(frame, width=5) #Cada e es una caja de texto (Entry) donde se colocará la probabilidad Pij.
-                e.grid(row=fila_fisica, column=j + 1, padx=2)
+                e = tk.Entry(
+                    frame,
+                    width=5,
+                    bd=2,
+                    relief="ridge",
+                    justify="center"
+                )
+                e.grid(row=fila_fisica, column=j + 1, padx=2, pady=2)
                 fila.append(e)
-                #Al final de esta parte, fila = [Entry, Entry, ...] → una fila con todas las cajas de probabilidad desde estado i.
-            self.entry_pij.append(fila) # Guardamos esa lista fila dentro de self.entry_pij, que será una matriz 2D de Entrys para esta decisión actual.
+            self.entry_pij.append(fila)
 
-            tk.Label(frame, text=f"C_{i}{k + 1}").grid(row=fila_fisica, column=self.n_estados + 2)
-            e_costo = tk.Entry(frame, width=6) #Entrada donde se escribirá el costo Cik para el estado i en esta decisión
-            e_costo.grid(row=fila_fisica, column=self.n_estados + 3)
+            tk.Label(
+                frame,
+                text=f"C_{i}{k + 1}",
+                font=("Helvetica", 12),
+                bg= '#DCDAD6'
+            ).grid(row=fila_fisica, column=self.n_estados + 2, padx=5, pady=5)
+
+            e_costo = tk.Entry(
+                frame,
+                width=6,
+                bd=2,
+                relief="ridge",
+                justify="center"
+            )
+            e_costo.grid(row=fila_fisica, column=self.n_estados + 3, padx=2, pady=2)
             self.entry_cik.append(e_costo)
+        
+        # botones centrados
+        btn_frame = ttk.Frame(self.root, padding=50)
+        btn_frame.pack(fill='x')
+        inner = ttk.Frame(btn_frame)
+        inner.pack()
 
-        # Botón para guardar y continuar
-        btn_siguiente = tk.Button(self.root, text="Guardar y continuar", command=self.guardar_decision)
-        btn_siguiente.pack(pady=10)
+        ttk.Button(
+            inner,
+            text="Corregir datos",
+            style='Azul.TButton',
+            command= self.guardar_decision
+        ).pack(side='left', padx=10)
+        ttk.Button(
+            inner,
+            text="Volver al menú",
+            style='Azul.TButton',
+            command=self.inicio
+        ).pack(side='left', padx=10)
 
-        # Botón para volver al inicio
-        btn_volver = tk.Button(self.root, text="Volver al menú", command=self.inicio)
-        btn_volver.pack()
 
     def guardar_decision(self):
         # Guardamos lo ingresado para esta decisión
@@ -255,114 +375,6 @@ class App:
         btn_volver = tk.Button(self.root, text="Volver al menú", command=self.inicio)
         btn_volver.pack()
 
-    def evaluar_politicas_usuario(self):
-            
-        self.politicas_usuario = []
-        for i, fila in enumerate(self.politicas_entries):# enumerate() te da el índice (i) y el elemento actual (fila) al mismo tiempo cuando recorres una lista.
-            #Ejemplo: lista = ['a', 'b', 'c']
-                        #for i, letra in enumerate(lista):
-                        #    print(i, letra)
-                            #PRINT:
-                                #0 a
-                                #1 b
-                                #2 c
-            try:
-                valores = [int(entry.get()) for entry in fila]# Lee los valores ingresados por el usuario en esa política y los convierte a int, formando una lista                   
-                if len(valores) != self.n_estados: # Verifica que la política tenga tantas decisiones como estados.
-                    print(f"❌ Política #{i+1} - número de decisiones no coincide con el número de estados.")
-                    raise ValueError
-                if any(d < 1 or d > self.n_decisiones for d in valores):#Asegura que cada decisión esté dentro del rango válido (por ejemplo, si tienes 2 decisiones, los únicos valores válidos son 0 o 1).
-                    print(f"❌ Política #{i+1} - decisiones fuera de rango permitido.")
-                    raise ValueError                    
-                self.politicas_usuario.append(valores)#Si todo está bien, guarda esa política en la lista
-            except ValueError:
-                messagebox.showerror("Error", f"Política #{i+1} inválida.")
-                return
-            
-
-        # Evaluamos como antes
-        resultados = []  # lista de diccionarios con info por política
-        mejor_politica_min = None
-        mejor_politica_max = None
-        mejor_valor_min = float("inf")  # Minimizar
-        mejor_valor_max = float("inf")  # Maximizar
-        
-        tk.Label(self.root, text="📊 Resultados por política", font=("Arial", 20)).pack(pady=10)
-        frame = tk.Frame(self.root)
-        frame.pack()
-        
-        for idx, politica in enumerate(self.politicas_usuario):
-        #for politica in self.politicas_usuario:
-            #print(f"\n🔍 Política #{idx+1}: {politica}")
-            
-            tk.Label(self.root, text= f"\n🔍 Política #{idx+1}: {politica}", font=("Arial", 14)).pack(pady=5)
-            
-            P = np.array([self.Pij[politica[i] - 1][i] for i in range(self.n_estados)])#una matriz P de tamaño n_estados x n_estados, específica de esa política.
-            C = np.array([self.Cik[politica[i] - 1][i] for i in range(self.n_estados)]) # costos para cada estado usando la decisión correspondiente según la política.
-
-            #print("📌 Matriz de transición P:")
-            #print(P)
-            #print("📌 Vector de costos C:")
-            #print(C)
-            
-            # Crear matriz A = (P^T - I), y vector b
-            A = P.T.copy()#matriz de transición transpuesta
-            for i in range(self.n_estados):
-                A[i][i] -= 1
-            A[-1] = np.ones(self.n_estados)# suma de π = 1
-            b = np.zeros(self.n_estados)#vector del lado derecho: ceros, excepto un 1 al final
-            b[-1] = 1
-            
-            #print("📐 Matriz A = P^T - I con última fila = 1:")
-            #print(A)
-            #print("📐 Vector b:")
-            #print(b)
-
-            try:
-                pi = np.linalg.solve(A, b)#vector estacionario
-                # Mostrar el vector π en la ventana principal
-                pi_texto = "π = [" + ", ".join([f"{round(x, 4)}" for x in pi]) + "]"
-                tk.Label(self.root, text=pi_texto, font=("Arial", 14), fg="blue").pack(pady=5)
-                
-                costo_esperado = np.dot(pi, C)#costo promedio esperado de la política
-                print(f"Política {politica} → Costo esperado: {round(costo_esperado, 4)}")
-                tk.Label(self.root, text=f"Política {politica} → Costo esperado: {round(costo_esperado, 4)}", font=("Arial", 14)).pack(pady=5)
-                if costo_esperado < mejor_valor_min:
-                    mejor_valor_min = costo_esperado
-                    mejor_politica_min = politica.copy()
-                    #print("📉 Esta es la mejor política (mínima) hasta ahora ✅")
-                if costo_esperado > mejor_valor_max:
-                    mejor_valor_max = costo_esperado
-                    mejor_politica_max = politica.copy()
-                    #print("📈 Esta es la mejor política (máxima) hasta ahora ✅")
-
-            except np.linalg.LinAlgError:
-                print(f"Política {politica} → Sistema sin solución")
-                print("❌ No se pudo resolver el sistema (matriz no invertible)")
-        
-        
-        for res in resultados:
-            texto = f"🔹 Política #{res['indice']}: {res['politica']}\n"
-            if isinstance(res['costo'], str):
-                texto += "   ❌ Sistema sin solución\n\n"
-            else:
-                texto += f"   π: {[round(x, 6) for x in res['pi']]}\n"
-                texto += f"   E(CRi): {round(res['costo'], 6)}\n\n"
-            tk.Label(frame, text=texto, justify="left", anchor="w").pack(fill="x", padx=10)
-
-        def mostrar_resultado(tipo):
-            if tipo == "min" and mejor_politica_min:
-                messagebox.showinfo("Política Óptima (Minimizar)", 
-                                    f"Política: {mejor_politica_min}\nE(CRi): {round(mejor_valor_min, 6)}")
-            elif tipo == "max" and mejor_politica_max:
-                messagebox.showinfo("Política Óptima (Maximizar)", 
-                                    f"Política: {mejor_politica_max}\nE(CRi): {round(mejor_valor_max, 6)}")
-
-        # Botones para mostrar política óptima
-        tk.Button(self.root, text="Mostrar política para minimizar", command=lambda: mostrar_resultado("min")).pack(pady=5)
-        tk.Button(self.root, text="Mostrar política para maximizar", command=lambda: mostrar_resultado("max")).pack(pady=5)
-        tk.Button(self.root, text="Cerrar", command=self.root.destroy).pack(pady=10)
-    
     
     def cargar_ejemplo_datos(self):
         self.n_estados = 4
@@ -418,40 +430,280 @@ class App:
         ]
         messagebox.showinfo("Datos cargados del ejemplo_Tarea", "Se cargaron los datos de ejemplo correctamente.\nPuedes ejecutar los algoritmos.")
 
+
     def mostrar_datos_ingresados(self):
+        # limpiar pantalla
+        self.root.configure(bg="#DCDAD6")
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        tk.Label(self.root, text="📋 Datos ingresados", font=("Arial", 16)).pack(pady=10)
-        tk.Label(self.root, text=f"Número de estados: {self.n_estados}").pack()
-        tk.Label(self.root, text=f"Número de decisiones: {self.n_decisiones}").pack(pady=5)
+        # encabezado
+        tk.Label(
+            self.root,
+            text="Datos ingresados",
+            font=("Arial", 16),
+            fg="black",
+            bg="#DCDAD6"
+        ).pack(pady=10)
 
-        frame = tk.Frame(self.root)
-        frame.pack(pady=10)
+        # resumen parámetros
+        tk.Label(
+            self.root,
+            text=f"Número de estados: {self.n_estados}",
+            font=("Arial", 16),
+            fg="black",
+            bg="#DCDAD6"
+        ).pack()
+        tk.Label(
+            self.root,
+            text=f"Número de decisiones: {self.n_decisiones}",
+            font=("Arial", 16),
+            fg="black",
+            bg="#DCDAD6"
+        ).pack(pady=5)
 
-        # Mostrar matriz Pij por decisión
+        # contenedor scrollable
+        container = tk.Frame(self.root, bg="#DCDAD6")
+        container.pack(fill='both', expand=True, padx=20, pady=10)
+        canvas = tk.Canvas(container, bg="#DCDAD6", highlightthickness=0)
+        vsb = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        scrollable = tk.Frame(canvas, bg="#DCDAD6")
+        scrollable.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.create_window((0, 0), window=scrollable, anchor="nw")
+
+        # mostrar matriz Pij
         for k in range(self.n_decisiones):
-            tk.Label(frame, text=f"Matriz de transición Pij para decisión {k + 1}:", font=("Arial", 12, "bold")).pack(anchor='w', pady=5)
+            tk.Label(
+                scrollable,
+                text=f"Matriz de transición Pij para decisión {k+1}:",
+                font=("Arial", 16),
+                fg="black",
+                bg="#DCDAD6"
+            ).pack(anchor='w', pady=(10, 2))
             for i in range(self.n_estados):
-                fila = f"Estado {i} → " + str(self.Pij[k][i])
-                tk.Label(frame, text=fila).pack(anchor='w')
+                fila = f"Estado {i} → {self.Pij[k][i]}"
+                tk.Label(
+                    scrollable,
+                    text=fila,
+                    font=("Arial", 16),
+                    fg="black",
+                    bg="#DCDAD6"
+                ).pack(anchor='w')
 
-        # Mostrar matriz de costos Cik
-        tk.Label(frame, text="\nMatriz de costos Cik:", font=("Arial", 12, "bold")).pack(anchor='w', pady=5)
+        # mostrar matriz de costos
+        tk.Label(
+            scrollable,
+            text="Matriz de costos Cik:",
+            font=("Arial", 16),
+            fg="black",
+            bg="#DCDAD6"
+        ).pack(anchor='w', pady=(10, 2))
         for k in range(self.n_decisiones):
-            fila_costos = f"Decisión {k + 1} → {self.Cik[k]}"
-            tk.Label(frame, text=fila_costos).pack(anchor='w')
+            fila = f"Decisión {k+1} → {self.Cik[k]}"
+            tk.Label(
+                scrollable,
+                text=fila,
+                font=("Arial", 16),
+                fg="black",
+                bg="#DCDAD6"
+            ).pack(anchor='w')
 
-        # Botones de acción
-        btn_corregir = tk.Button(self.root, text="Corregir datos", command=lambda: self.llenar_decision(0))
-        btn_corregir.pack(pady=10)
+        # botones centrados
+        btn_frame = ttk.Frame(self.root, padding=10)
+        btn_frame.pack(fill='x')
+        inner = ttk.Frame(btn_frame)
+        inner.pack()
 
-        btn_continuar = tk.Button(self.root, text="Continuar a ingreso de políticas", command=self.pedir_politicas)
-        btn_continuar.pack(pady=5)
+        ttk.Button(
+            inner,
+            text="Corregir datos",
+            style='Azul.TButton',
+            command=lambda: self.llenar_decision(0)
+        ).pack(side='left', padx=5)
+        ttk.Button(
+            inner,
+            text="Continuar a ingreso de políticas",
+            style='Azul.TButton',
+            command=self.pedir_politicas
+        ).pack(side='left', padx=5)
+        ttk.Button(
+            inner,
+            text="Volver al menú",
+            style='Azul.TButton',
+            command=self.inicio
+        ).pack(side='left', padx=5)
 
-        btn_inicio = tk.Button(self.root, text="Volver al menú", command=self.inicio)
-        btn_inicio.pack(pady=5)
+    def evaluar_politicas_usuario(self):
+        # Validación de políticas (sin cambios)
+        self.politicas_usuario = []
+        for i, fila in enumerate(self.politicas_entries):
+            try:
+                valores = [int(entry.get()) for entry in fila]
+                if len(valores) != self.n_estados:
+                    raise ValueError
+                if any(d < 1 or d > self.n_decisiones for d in valores):
+                    raise ValueError
+                self.politicas_usuario.append(valores)
+            except ValueError:
+                messagebox.showerror("Error", f"Política #{i+1} inválida.")
+                return
 
+        # --- Cálculo de mínimo y máximo ---
+        mejor_politica_min = None
+        mejor_politica_max = None
+        mejor_valor_min = float("inf")
+        mejor_valor_max = float("-inf")
+
+        for politica in self.politicas_usuario:
+            P = np.array([self.Pij[politica[i]-1][i] for i in range(self.n_estados)])
+            C = np.array([self.Cik[politica[i]-1][i] for i in range(self.n_estados)])
+            A = P.T.copy()
+            for j in range(self.n_estados):
+                A[j][j] -= 1
+            A[-1] = np.ones(self.n_estados)
+            b = np.zeros(self.n_estados); b[-1] = 1
+            try:
+                pi = np.linalg.solve(A, b)
+                costo_esp = float(np.dot(pi, C))
+                # Minimizar
+                if costo_esp < mejor_valor_min:
+                    mejor_valor_min = costo_esp
+                    mejor_politica_min = politica.copy()
+                # Maximizar
+                if costo_esp > mejor_valor_max:
+                    mejor_valor_max = costo_esp
+                    mejor_politica_max = politica.copy()
+            except np.linalg.LinAlgError:
+                pass
+
+        # --- INTERFAZ CON ESTILO Y SCROLLABLE ---
+        self.root.configure(bg="#DCDAD6")
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # Encabezado
+        tk.Label(
+            self.root,
+            text="Resultados por política",
+            font=('Arial', 22, 'bold'),
+            fg="black",
+            bg="#DCDAD6"
+        ).pack(pady=10)
+
+        # Contenedor scrollable
+        container = tk.Frame(self.root, bg="#DCDAD6")
+        container.pack(fill="both", expand=True, padx=20, pady=10)
+        canvas = tk.Canvas(container, bg="#DCDAD6", highlightthickness=0)
+        vsb = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        scrollable = tk.Frame(canvas, bg="#DCDAD6")
+        scrollable.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.create_window((0, 0), window=scrollable, anchor="nw")
+
+        # Mostrar cada política y sus resultados
+        for idx, politica in enumerate(self.politicas_usuario):
+            tk.Label(
+                scrollable,
+                text=f"Política #{idx+1}: {politica}",
+                font=("Arial", 18, 'bold'),
+                fg="#2a9d8f",
+                bg="#DCDAD6"
+            ).pack(anchor="w", pady=(10, 2))
+
+            # Vector π
+            P = np.array([self.Pij[politica[i]-1][i] for i in range(self.n_estados)])
+            C = np.array([self.Cik[politica[i]-1][i] for i in range(self.n_estados)])
+            A = P.T.copy()
+            for j in range(self.n_estados):
+                A[j][j] -= 1
+            A[-1] = np.ones(self.n_estados)
+            b = np.zeros(self.n_estados); b[-1] = 1
+
+            try:
+                pi = np.linalg.solve(A, b)
+                pi_texto = "[" + ", ".join(f"{x:.4f}" for x in pi) + "]"
+                tk.Label(
+                    scrollable,
+                    text=f"π = {pi_texto}",
+                    font=("Arial", 16),
+                    fg="black",
+                    bg="#DCDAD6"
+                ).pack(anchor="w", pady=2)
+                costo_esp = float(np.dot(pi, C))
+                tk.Label(
+                    scrollable,
+                    text=f"Costo esperado: {costo_esp:.4f}",
+                    font=("Arial", 14, "italic"),
+                    fg="#588157",
+                    bg="#DCDAD6"
+                ).pack(anchor="w", pady=2)
+            except np.linalg.LinAlgError:
+                tk.Label(
+                    scrollable,
+                    text="Sistema sin solución",
+                    font=("Arial", 16),
+                    fg="black",
+                    bg="#DCDAD6"
+                ).pack(anchor="w", pady=2)
+
+        # --- Funciones internas para mostrar diálogo óptimo ---
+        def mostrar_optimo_min():
+            if mejor_politica_min is None:
+                messagebox.showwarning("Atención", "No se encontró política óptima para minimizar.")
+            else:
+                messagebox.showinfo(
+                    "Óptimo (Minimizar)",
+                    f"Política: {mejor_politica_min}\nCosto: {mejor_valor_min:.4f}"
+                )
+
+        def mostrar_optimo_max():
+            if mejor_politica_max is None:
+                messagebox.showwarning("Atención", "No se encontró política óptima para maximizar.")
+            else:
+                messagebox.showinfo(
+                    "Óptimo (Maximizar)",
+                    f"Política: {mejor_politica_max}\nCosto: {mejor_valor_max:.4f}"
+                )
+
+        # Botones centrales con padding y centrados
+        btn_frame = ttk.Frame(self.root, padding=10)
+        btn_frame.pack(fill="x")
+        inner = ttk.Frame(btn_frame)
+        inner.pack()
+
+        ttk.Button(
+            inner,
+            text="Óptimo Min",
+            style='Azul.TButton',
+            command=mostrar_optimo_min
+        ).pack(side="left", padx=5)
+        ttk.Button(
+            inner,
+            text="Óptimo Max",
+            style='Azul.TButton',
+            command=mostrar_optimo_max
+        ).pack(side="left", padx=5)
+        ttk.Button(
+            inner,
+            text="Volver al menú",
+            style='Azul.TButton',
+            command=self.inicio
+        ).pack(side='left', padx=5)
+
+    
 ##############################################################################################################################################3
     def metodo_mejoramiento_politicas(self):
         # Paso 0: política inicial
