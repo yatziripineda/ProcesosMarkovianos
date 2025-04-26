@@ -409,7 +409,7 @@ class App:
         messagebox.showinfo("Datos cargados", "Se cargaron los datos de ejemplo correctamente.\nPuedes ejecutar los algoritmos.")
     
 
-    def cargar_ejemplo_datos_Tarea(self):
+    def cargar_ejemplo_datos_Tarea1(self):
         self.n_estados = 2
         self.n_decisiones = 2
 
@@ -429,6 +429,43 @@ class App:
             [14, 14],    # Decisión 2
         ]
         messagebox.showinfo("Datos cargados del ejemplo_Tarea", "Se cargaron los datos de ejemplo correctamente.\nPuedes ejecutar los algoritmos.")
+
+    def cargar_ejemplo_datos_Tarea(self):
+        # 1) Número de estados y decisiones
+        self.n_estados = 3
+        self.n_decisiones = 3
+
+        # 2) Probabilidades de transición Pij[decisión][estado][estado_siguiente]
+        self.Pij = [
+            [  # Decisión 0: Radio
+                [0.4, 0.5, 0.1],   # Estado 0 (Regular)
+                [0.1, 0.7, 0.2],   # Estado 1 (Bueno)
+                [0.1, 0.2, 0.7]    # Estado 2 (Excelente)
+            ],
+            [  # Decisión 1: TV
+                [0.7, 0.2, 0.1],
+                [0.3, 0.6, 0.1],
+                [0.1, 0.7, 0.2]
+            ],
+            [  # Decisión 2: Periódico
+                [0.2, 0.5, 0.3],
+                [0.0, 0.7, 0.3],
+                [0.0, 0.2, 0.8]
+            ]
+        ]
+
+        # 3) Ingresos inmediatos Cik[decisión][estado] (en miles de dólares)
+        self.Cik = [
+            [280, 250, 220],    # Radio: ingresos en estados 0,1,2
+            [220, 110, -130],   # TV
+            [258, 255, 300]     # Periódico
+        ]
+
+        # 4) Confirmación al usuario
+        messagebox.showinfo(
+            "Datos cargados de la práctica",
+            "Se cargaron los datos de la práctica correctamente.\nAhora puedes ejecutar los algoritmos."
+        )
 
 
     def mostrar_datos_ingresados(self):
@@ -718,128 +755,185 @@ class App:
             if len(politica) != self.n_estados or any(d < 1 or d > self.n_decisiones for d in politica):
                 raise ValueError
         except ValueError:
-            messagebox.showerror("Error", "Política inicial inválida.")
+            # mostrar error en pantalla
+            self.root.configure(bg="#DCDAD6")
+            for w in self.root.winfo_children(): w.destroy()
+            tk.Label(self.root,
+                    text="Política inicial inválida.",
+                    font=("Arial", 16, "bold"),
+                    fg="red",
+                    bg="#DCDAD6").pack(pady=20)
+            ttk.Button(self.root,
+                    text="Volver al menú",
+                    style='Azul.TButton',
+                    command=self.inicio).pack(pady=10)
             return
 
+        # preparar interfaz scrollable
+        self.root.configure(bg="#DCDAD6")
+        for w in self.root.winfo_children(): w.destroy()
+        ttk.Label(self.root,
+                text="Mejoramiento de políticas",
+                font=("Arial", 16, "bold"),
+                foreground="black",
+                background="#DCDAD6").pack(pady=10)
+
+        container = tk.Frame(self.root, bg="#DCDAD6")
+        container.pack(fill="both", expand=True, padx=20, pady=10)
+        canvas = tk.Canvas(container, bg="#DCDAD6", highlightthickness=0)
+        vsb = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollable = tk.Frame(canvas, bg="#DCDAD6")
+        scrollable.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.create_window((0, 0), window=scrollable, anchor="nw")
+
+        # variables para el bucle
         n = self.n_estados
-        m = n - 1  # índice último estado
+        m = n - 1
         decisiones = self.n_decisiones
         iteracion = 0
 
         while True:
             iteracion += 1
-            # Construir matriz P y vector C según R
+
+            # construir P, C, A, b
             P = np.array([self.Pij[pol - 1][i] for i, pol in enumerate(politica)])
             C = np.array([self.Cik[pol - 1][i] for i, pol in enumerate(politica)])
-
-            # Preparar A x = b para variables [V0...V_{m-1}, g]
-            A = np.zeros((n + 1, n + 1))
-            b = np.zeros(n + 1)
-            # Paso 1: Bellman promedio
+            A = np.zeros((n+1, n+1))
+            b = np.zeros(n+1)
             for i in range(n):
-                # Coeficiente para V_i: 1 - p_{ii}
                 if i < m:
-                    coef_vi = 1 - P[i, i]
-                    A[i, i] = coef_vi
-                # Coeficientes para V_j, j != i, j < m
-                for j in range(m):
-                    if j != i and P[i, j] != 0:
-                        A[i, j] = -P[i, j]
-                # Coeficiente de g
-                A[i, -1] = 1
-                # Lado derecho = C_i
-                b[i] = C[i]
-            # Normalización: V_m = 0
-            A[n, m] = 1
-            b[n] = 0
-
-            # Mostrar sistema de ecuaciones simbólicamente
-            sys_text = f"Iteración {iteracion} - Sistema de ecuaciones:\n"
-            for i in range(n):
-                terms = ["g"]
-                # V_i término combinado
-                if i < m and (1 - P[i,i]) != 0:
-                    terms.append(f"+ {round(1 - P[i,i],3)} V{i}")
-                # otros V_j
+                    A[i,i] = 1 - P[i,i]
                 for j in range(m):
                     if j != i and P[i,j] != 0:
-                        terms.append(f"- {round(P[i,j],3)} V{j}")
-                rhs = round(C[i],3)
-                sys_text += " ".join(terms) + f" = {rhs}\n"
-            # Ecuación de normalización se muestra aparte
-            sys_text += f"V{m} = 0"
-            messagebox.showinfo("Sistema de ecuaciones", sys_text)
+                        A[i,j] = -P[i,j]
+                A[i,-1] = 1
+                b[i] = C[i]
+            A[n,m] = 1
+            b[n] = 0
 
-            # Resolver el sistema
+            # mostrar sistema
+            sys_text = f"Iteración {iteracion} – Sistema:\n"
+            for i in range(n):
+                terms = []
+                if i < m and 1-P[i,i] != 0:
+                    terms.append(f"{round(1-P[i,i],3)}·V{i}")
+                for j in range(m):
+                    if j!=i and P[i,j]!=0:
+                        terms.append(f"-{round(P[i,j],3)}·V{j}")
+                terms.append("+ g")
+                rhs = round(C[i],3)
+                sys_text += " + ".join(terms) + f" = {rhs}\n"
+            sys_text += f"V{m} = 0"
+            tk.Label(scrollable,
+                    text=sys_text,
+                    font=("Arial", 16),
+                    fg="black",
+                    bg="#DCDAD6",
+                    justify="left").pack(anchor="w", pady=5)
+
+            # resolver
             try:
                 x = np.linalg.solve(A, b)
             except np.linalg.LinAlgError:
-                messagebox.showerror("Error", f"Sistema sin solución en iteración {iteracion}.")
-                return
+                tk.Label(scrollable,
+                        text=f"Sistema sin solución en iteración {iteracion}.",
+                        font=("Arial", 16),
+                        fg="red",
+                        bg="#DCDAD6").pack(anchor="w", pady=5)
+                break
 
-            # Mostrar solución
-            sol_text = f"Solución (Iteración {iteracion}):\n"
+            # mostrar solución
+            sol_text = f"Solución (Iter {iteracion}):\n"
             for idx in range(n):
-                sol_text += f"V_{idx} = {round(x[idx],6)}\n"
+                sol_text += f"V{idx} = {round(x[idx],6)}\n"
             sol_text += f"g = {round(x[-1],6)}"
-            messagebox.showinfo("Solución del sistema", sol_text)
+            tk.Label(scrollable,
+                    text=sol_text,
+                    font=("Arial", 16),
+                    fg="black",
+                    bg="#DCDAD6",
+                    justify="left").pack(anchor="w", pady=5)
 
-            V = x[:n]
-            g = x[-1]
-            # Paso 2: mejora de política con detalle de cálculos
-            nueva = []
-            # Calcular y mostrar detalle de mejora
-            detalle = f"Iteración {iteracion} - Detalle de mejora de política:"
+            V = x[:n]; g = x[-1]
+
+            # dentro de metodo_mejoramiento_politicas, reemplaza la parte de “mejora de política” por esto:
+
+            # mejora de política
+            detalle = f"Detalle mejora (Iter {iteracion}):\n"
             nueva = []
             for i in range(n):
-                detalle += f"Estado {i}:"
-                # Determinar acciones viables: aquellas con probabilidad o costo no nulo
-                acciones = []
-                for k in range(decisiones):
-                    if any(abs(self.Pij[k][i][j]) > 1e-6 for j in range(n)) or abs(self.Cik[k][i]) > 1e-6:
-                        acciones.append(k)
+                # obtenemos las acciones posibles en el estado i
+                acciones = [
+                    k for k in range(decisiones)
+                    if any(abs(self.Pij[k][i][j]) > 1e-6 for j in range(n))
+                    or abs(self.Cik[k][i]) > 1e-6
+                ]
                 mejor_val = None
                 mejor_k = None
                 for k in acciones:
-                    # Sustitución numérica: c_i,k + sum_j p_ij(k)*V_j - V_i
                     ci = round(self.Cik[k][i], 2)
-                    vi = V[i]
-                    suma_pv = 0
-                    terminos = []
-                    for j in range(n):
-                        pij = self.Pij[k][i][j]
-                        vj = V[j]
-                        if abs(pij) > 1e-6:
-                            suma_pv += pij * vj
-                            terminos.append(f"{round(pij,3)}*({round(vj,2)})")
-                    valor = ci + suma_pv - vi
-                    linea = f"  k={k+1}: {ci} + {' + '.join(terminos)} - ({round(vi,2)}) = {round(valor,2)}"
-                    detalle += linea
+                    vi = round(V[i], 2)  # done: redondear V[i] para claridad
+                    # done: construir términos de la suma P_ij * V_j
+                    terms = " + ".join(
+                        f"{round(self.Pij[k][i][j], 2)}·V{j}"
+                        for j in range(n)
+                        if abs(self.Pij[k][i][j]) > 1e-6
+                    )
+                    # done: formar la ecuación como cadena
+                    equation = f"{ci} + ({terms}) - {vi}"
+                    # calculamos el valor numérico
+                    valor = ci + sum(self.Pij[k][i][j] * V[j] for j in range(n)) - V[i]
+                    # done: añadir al texto tanto la ecuación como el resultado
+                    detalle += f"Estado {i}, k={k+1}: {equation} = {round(valor, 2)}\n"
+                    # buscamos la mejor acción
                     if mejor_val is None or valor < mejor_val:
-                        mejor_val = valor
-                        mejor_k = k + 1
+                        mejor_val, mejor_k = valor, k+1
                 nueva.append(mejor_k)
-                detalle += f"  => Mejor decisión: k={mejor_k}"
-            messagebox.showinfo("Detalle de mejora", detalle)
+                detalle += f"→ Mejor decisión: k={mejor_k}\n"
+            # mostramos todo el detalle en pantalla
+            tk.Label(
+                scrollable,
+                text=detalle,
+                font=("Arial", 16),
+                fg="black",
+                bg="#DCDAD6",
+                justify="left"
+            ).pack(anchor="w", pady=5)
 
-            # Mostrar política mejorada con formato
-            mensaje = f"Iteración {iteracion}: Política mejorada"
-            for estado, k_opt in enumerate(nueva):
-                mensaje += f"➡️ Estado {estado}: decisión óptima = k={k_opt}"
-            messagebox.showinfo("Política mejorada", mensaje) 
-            # Formatear las decisiones óptimas por estado
-            mensaje = f"Iteración {iteracion}: Política mejorada"
-            for estado, k_opt in enumerate(nueva):
-                mensaje += f"➡️ Estado {estado}: decisión óptima = k={k_opt}"
-            messagebox.showinfo("Política mejorada", mensaje)
-            # Prueba de optimalidad y fin
+
+            # política mejorada
+            pol_text = f"Política nueva (Iter {iteracion}): {nueva}"
+            tk.Label(scrollable,
+                    text=pol_text,
+                    font=("Arial", 16, "bold"),
+                    fg="#2a9d8f",
+                    bg="#DCDAD6").pack(anchor="w", pady=5)
+
+            # convergencia
             if nueva == politica:
-                messagebox.showinfo(
-                    "Convergencia",
-                    f"La política no cambió en la iteración {iteracion}. Se detiene el algoritmo."
-                )
+                conv = f"No cambió en iteración {iteracion}. Termina."
+                tk.Label(scrollable,
+                        text=conv,
+                        font=("Arial", 16, "italic"),
+                        fg="#e76f51",
+                        bg="#DCDAD6").pack(anchor="w", pady=10)
                 break
             politica = nueva
+
+        # botón para regresar
+        btn_frame = ttk.Frame(self.root, padding=10)
+        btn_frame.pack(fill="x")
+        ttk.Button(btn_frame,
+                text="Volver al menú",
+                style='Azul.TButton',
+                command=self.inicio).pack(pady=10)
+
 ################################################################################################
        
         
