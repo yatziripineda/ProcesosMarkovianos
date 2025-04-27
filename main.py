@@ -1209,6 +1209,7 @@ class App:
         entrada = simpledialog.askstring(
             "Aproximaciones Sucesivas",
             "Introduce α, #iteraciones N y tolerancia ε (separados por espacio):"
+        )
         if not entrada:
             return
         try:
