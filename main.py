@@ -96,18 +96,25 @@ class App:
                    command=self.resolver_ppl)\
             .pack(side='top', fill='x', pady=3)
         ttk.Button(algo_frame,
+                   text="Mejoramiento de políticas con descuento",
+                   width=25,
+                   command=self.metodo_mejoramiento_con_descuentos)\
+            .pack(side='top', fill='x', pady=3)  
+            
+        ttk.Button(algo_frame,
+
                    text="Método de Aproximaciones Sucesivas",
                    width=25,
                    command=self.metodo_aproximaciones_sucesivas)\
             .pack(side='top', fill='x', pady=3)
-            
-
+        
         # --- Botón de salir destacado ---
         exit_btn = ttk.Button(self.root, text="Salir", width=30, command=self.root.quit)
         exit_btn.pack(pady=20)
 
         # Actualiza barra de estado
         self.status_var.set("Vista de inicio cargada")
+
 
 
     def abrir_lectura_datos(self):
@@ -577,12 +584,7 @@ class App:
             style='Azul.TButton',
             command=lambda: self.llenar_decision(0)
         ).pack(side='left', padx=5)
-        ttk.Button(
-            inner,
-            text="Continuar a ingreso de políticas",
-            style='Azul.TButton',
-            command=self.pedir_politicas
-        ).pack(side='left', padx=5)
+        
         ttk.Button(
             inner,
             text="Volver al menú",
@@ -946,7 +948,9 @@ class App:
                 style='Azul.TButton',
                 command=self.inicio).pack(pady=10)
 
+
 ################################################################################################################################################################################################
+
     def resolver_ppl(self):
         for widget in self.root.winfo_children():
             widget.destroy()
@@ -1061,14 +1065,150 @@ class App:
 
         # Botón para volver
         tk.Button(self.root, text="Volver al menú", command=self.inicio).pack(pady=10)
-            
+
+        
+############################################################################################################################################
+    def metodo_mejoramiento_con_descuentos(self):
+        # --- Paso 0: Política inicial ---
+        entrada = simpledialog.askstring(
+            "Política inicial",
+            f"Escribe la política inicial R de {self.n_estados} valores (1 a {self.n_decisiones}, separados por espacio):"
+
+        )
+        if not entrada:
+            return
+        try:
+            politica = list(map(int, entrada.strip().split()))
+            if len(politica) != self.n_estados or any(d < 1 or d > self.n_decisiones for d in politica):
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "Política inicial inválida.")
+            return
+
+        # --- Paso 1: Factor de descuento α ---
+        alpha_str = simpledialog.askstring(
+            "Factor de descuento",
+            "Introduce el factor de descuento α (0 < α < 1):"
+        )
+        try:
+            alpha = float(alpha_str)
+            if not (0 < alpha < 1):
+                raise ValueError
+        except:
+            messagebox.showerror("Error", "Factor de descuento inválido.")
+            return
+
+        # --- Preparo interfaz scrollable ---
+        self.root.configure(bg="#DCDAD6")
+        for w in self.root.winfo_children():
+            w.destroy()
+        ttk.Label(self.root, text="Mejoramiento con Descuento",
+                font=("Arial",16,"bold"), background="#DCDAD6").pack(pady=10)
+
+        container = tk.Frame(self.root, bg="#DCDAD6")
+        container.pack(fill="both", expand=True, padx=20, pady=10)
+        canvas = tk.Canvas(container, bg="#DCDAD6", highlightthickness=0)
+        vsb = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y"); canvas.pack(side="left", fill="both", expand=True)
+        scrollable = tk.Frame(canvas, bg="#DCDAD6")
+        scrollable.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0,0), window=scrollable, anchor="nw")
+
+        n = self.n_estados
+        iteracion = 0
+
+        while True:
+            iteracion += 1
+
+            # --- Paso 2: Resolver (I - α·P_π)·V = C_π ---
+            Ppi = np.array([self.Pij[pol-1][i] for i, pol in enumerate(politica)])
+            Cpi = np.array([self.Cik[pol-1][i] for i, pol in enumerate(politica)])
+            A = np.eye(n) - alpha * Ppi
+            b = Cpi
+
+            # Mostrar sistema
+            sys_text = f"Iter {iteracion} – Sistema con α={alpha}:\n"
+            for i in range(n):
+                terms = [f"{round(A[i,j],3)}·V{j}" for j in range(n) if abs(A[i,j])>1e-6]
+                sys_text += " + ".join(terms) + f" = {round(b[i],3)}\n"
+            tk.Label(scrollable, text=sys_text, font=("Arial",16), fg="black", bg="#DCDAD6", justify="left")\
+                .pack(anchor="w", pady=5)
+
+            try:
+                V = np.linalg.solve(A, b)
+            except np.linalg.LinAlgError:
+                tk.Label(scrollable, text="Sistema singular. Termina.",
+                        font=("Arial",16), fg="red", bg="#DCDAD6")\
+                    .pack(anchor="w", pady=5)
+                break
+
+            # Mostrar V
+            sol_text = f"Valores V (Iter {iteracion}):\n"
+            for i, vi in enumerate(V):
+                sol_text += f"V{i} = {round(vi,6)}\n"
+            tk.Label(scrollable, text=sol_text, font=("Arial",16), fg="black", bg="#DCDAD6", justify="left")\
+                .pack(anchor="w", pady=5)
+
+            # --- Paso 3: Mejora de política ignorando decisiones con Pij[k][i] toda ceros ---
+            detalle = f"Detalle mejora con α (Iter {iteracion}):\n"
+            nueva = []
+            for i in range(n):
+                # Encuentro qué decisiones k tienen Pij[k][i] no todas ceros o un costo distinto de 0
+                acciones = [
+                    k for k in range(self.n_decisiones)
+                    if any(abs(self.Pij[k][i][j])>1e-6 for j in range(n))
+                    or abs(self.Cik[k][i])>1e-6
+                ]
+                if not acciones:
+                    # Si ninguna decisión aplica (fila cero en todas), conservo la actual
+                    detalle += f"Estado {i}: sin transiciones válidas → conservo k={politica[i]}\n"
+                    nueva.append(politica[i])
+                    continue
+
+                mejor_val, mejor_k = None, None
+                for k in acciones:
+                    ci = round(self.Cik[k][i],2)
+                    suma_pv = sum(self.Pij[k][i][j] * V[j] for j in range(n))
+                    Q = ci + alpha * suma_pv
+                    detalle += (f"Estado {i}, k={k+1}: "
+                                f"{ci} + {alpha}*({round(suma_pv,3)}) = {round(Q,2)}\n")
+                    if mejor_val is None or Q < mejor_val:
+                        mejor_val, mejor_k = Q, k+1
+                nueva.append(mejor_k)
+                detalle += f"→ Mejor decisión: k={mejor_k}\n"
+
+            tk.Label(scrollable, text=detalle, font=("Arial",16), fg="black", bg="#DCDAD6", justify="left")\
+                .pack(anchor="w", pady=5)
+
+            # Mostrar política nueva
+            tk.Label(scrollable,
+                    text=f"Política nueva (Iter {iteracion}): {nueva}",
+                    font=("Arial",16,"bold"), fg="#2a9d8f", bg="#DCDAD6")\
+                .pack(anchor="w", pady=5)
+
+            # --- Paso 4: Convergencia ---
+            if nueva == politica:
+                tk.Label(scrollable,
+                        text=f"Convergió en iteración {iteracion}.",
+                        font=("Arial",16,"italic"), fg="#e76f51", bg="#DCDAD6")\
+                    .pack(anchor="w", pady=10)
+                break
+            politica = nueva
+
+        # Botón para regresar al menú
+        btn_frame = ttk.Frame(self.root, padding=10)
+        btn_frame.pack(fill="x")
+        ttk.Button(btn_frame, text="Volver al menú", style='Azul.TButton',
+                command=self.inicio).pack(pady=10)
+
+           
 ################################################################################################################################################################################################
     def metodo_aproximaciones_sucesivas(self):
         # --- Paso 0: Leer α, N y ε ---
         entrada = simpledialog.askstring(
             "Aproximaciones Sucesivas",
             "Introduce α, #iteraciones N y tolerancia ε (separados por espacio):"
-        )
         if not entrada:
             return
         try:
