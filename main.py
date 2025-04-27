@@ -60,13 +60,19 @@ class App:
         # --- Sección: Lectura de datos ---
         data_frame = ttk.LabelFrame(self.root, text="Lectura de datos", padding=10)
         data_frame.pack(padx=20, pady=10, fill='x')
-        ttk.Button(data_frame, text="Leer datos", width=20, command=self.abrir_lectura_datos)\
+        ttk.Button(data_frame, text="Leer datos", width=40, command=self.abrir_lectura_datos)\
             .pack(side='left', padx=5, pady=5)
-        ttk.Button(data_frame, text="Cargar ejemplo", width=20, command=self.cargar_ejemplo_datos)\
+        ttk.Button(data_frame, text="Mostrar datos", width=40, command=self.mostrar_datos_ingresados)\
             .pack(side='left', padx=5, pady=5)
-        ttk.Button(data_frame, text="Ejemplo de tarea", width=20, command=self.cargar_ejemplo_datos_Tarea)\
+            
+        # --- Sección: Ejercicios prueba ---
+        data_frame = ttk.LabelFrame(self.root, text="Ejercicios prueb", padding=10)
+        data_frame.pack(padx=20, pady=10, fill='x')
+        ttk.Button(data_frame, text="Cargar ejemplo", width=25, command=self.cargar_ejemplo_datos)\
             .pack(side='left', padx=5, pady=5)
-        ttk.Button(data_frame, text="Mostrar datos", width=20, command=self.mostrar_datos_ingresados)\
+        ttk.Button(data_frame, text="Ejemplo de tarea_1", width=25, command=self.cargar_ejemplo_datos_Tarea1)\
+            .pack(side='left', padx=5, pady=5)
+        ttk.Button(data_frame, text="Ejemplo de tarea_2", width=25, command=self.cargar_ejemplo_datos_Tarea)\
             .pack(side='left', padx=5, pady=5)
 
         # --- Sección: Algoritmos disponibles ---
