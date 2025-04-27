@@ -14,6 +14,8 @@ class App:
         self.root.title("Procesos de Decisión de Markov")
         self.root.geometry("1000x800")
         self.root.configure(bg="#DCDAD6")
+        self.min = True   # o False, según convenga por defecto
+
 
         # --- Estilos ttk ---
         self.style = ttk.Style()
@@ -60,13 +62,19 @@ class App:
         # --- Sección: Lectura de datos ---
         data_frame = ttk.LabelFrame(self.root, text="Lectura de datos", padding=10)
         data_frame.pack(padx=20, pady=10, fill='x')
-        ttk.Button(data_frame, text="Leer datos", width=20, command=self.abrir_lectura_datos)\
+        ttk.Button(data_frame, text="Leer datos", width=40, command=self.abrir_lectura_datos)\
             .pack(side='left', padx=5, pady=5)
-        ttk.Button(data_frame, text="Cargar ejemplo", width=20, command=self.cargar_ejemplo_datos)\
+        ttk.Button(data_frame, text="Mostrar datos", width=40, command=self.mostrar_datos_ingresados)\
             .pack(side='left', padx=5, pady=5)
-        ttk.Button(data_frame, text="Ejemplo de tarea", width=20, command=self.cargar_ejemplo_datos_Tarea)\
+            
+        # --- Sección: Ejercicios prueba ---
+        data_frame = ttk.LabelFrame(self.root, text="Ejercicios prueb", padding=10)
+        data_frame.pack(padx=20, pady=10, fill='x')
+        ttk.Button(data_frame, text="Cargar ejemplo", width=25, command=self.cargar_ejemplo_datos)\
             .pack(side='left', padx=5, pady=5)
-        ttk.Button(data_frame, text="Mostrar datos", width=20, command=self.mostrar_datos_ingresados)\
+        ttk.Button(data_frame, text="Ejemplo de tarea_1", width=25, command=self.cargar_ejemplo_datos_Tarea1)\
+            .pack(side='left', padx=5, pady=5)
+        ttk.Button(data_frame, text="Ejemplo de tarea_2", width=25, command=self.cargar_ejemplo_datos_Tarea)\
             .pack(side='left', padx=5, pady=5)
 
         # --- Sección: Algoritmos disponibles ---
@@ -93,7 +101,13 @@ class App:
                    command=self.metodo_mejoramiento_con_descuentos)\
             .pack(side='top', fill='x', pady=3)  
             
-            
+        ttk.Button(algo_frame,
+
+                   text="Método de Aproximaciones Sucesivas",
+                   width=25,
+                   command=self.metodo_aproximaciones_sucesivas)\
+            .pack(side='top', fill='x', pady=3)
+        
         # --- Botón de salir destacado ---
         exit_btn = ttk.Button(self.root, text="Salir", width=30, command=self.root.quit)
         exit_btn.pack(pady=20)
@@ -101,8 +115,6 @@ class App:
         # Actualiza barra de estado
         self.status_var.set("Vista de inicio cargada")
 
-        
-    
 
 
     def abrir_lectura_datos(self):
@@ -743,8 +755,7 @@ class App:
             command=self.inicio
         ).pack(side='left', padx=5)
 
-    
-##############################################################################################################################################3
+##############################################################################################################################################
     def metodo_mejoramiento_politicas(self):
         # Paso 0: política inicial
         entrada = simpledialog.askstring(
@@ -937,9 +948,9 @@ class App:
                 style='Azul.TButton',
                 command=self.inicio).pack(pady=10)
 
-################################################################################################
-       
-        
+
+################################################################################################################################################################################################
+
     def resolver_ppl(self):
         for widget in self.root.winfo_children():
             widget.destroy()
@@ -1054,6 +1065,7 @@ class App:
 
         # Botón para volver
         tk.Button(self.root, text="Volver al menú", command=self.inicio).pack(pady=10)
+
         
 ############################################################################################################################################
     def metodo_mejoramiento_con_descuentos(self):
@@ -1061,6 +1073,7 @@ class App:
         entrada = simpledialog.askstring(
             "Política inicial",
             f"Escribe la política inicial R de {self.n_estados} valores (1 a {self.n_decisiones}, separados por espacio):"
+
         )
         if not entrada:
             return
@@ -1189,8 +1202,291 @@ class App:
         ttk.Button(btn_frame, text="Volver al menú", style='Azul.TButton',
                 command=self.inicio).pack(pady=10)
 
+           
+################################################################################################################################################################################################
+    def metodo_aproximaciones_sucesivas(self):
+        # --- Paso 0: Leer α, N y ε ---
+        entrada = simpledialog.askstring(
+            "Aproximaciones Sucesivas",
+            "Introduce α, #iteraciones N y tolerancia ε (separados por espacio):"
+        if not entrada:
+            return
+        try:
+            alpha_str, N_str, eps_str = entrada.strip().split()
+            alpha = float(alpha_str)
+            N = int(N_str)
+            epsilon = float(eps_str)
+            if not (0 < alpha <= 1 and N > 0 and epsilon >= 0):
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "Parámetros inválidos.")
+            return
+
+        # --- Preparo interfaz scrollable ---
+        self.root.configure(bg="#DCDAD6")
+        for w in self.root.winfo_children(): w.destroy()
+        ttk.Label(
+            self.root,
+            text="Aproximaciones Sucesivas",
+            font=("Arial",16,"bold"),
+            background="#DCDAD6"
+        ).pack(pady=10)
+
+        container = tk.Frame(self.root, bg="#DCDAD6")
+        container.pack(fill="both", expand=True, padx=20, pady=10)
+        canvas = tk.Canvas(container, bg="#DCDAD6", highlightthickness=0)
+        vsb = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y"); canvas.pack(side="left", fill="both", expand=True)
+        scrollable = tk.Frame(canvas, bg="#DCDAD6")
+        scrollable.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0,0), window=scrollable, anchor="nw")
+        
+        
+
+        n = self.n_estados
+        V = np.zeros(n)
+
+        # --- Paso 1: n = 1, V¹ᵢ = min_k Cᵢₖ ---
+        tk.Label(
+            scrollable,
+            text="                      Iteración 1",
+            font=("Arial",20,"bold"),
+            fg="#2a9d8f",
+            bg="#DCDAD6"
+        ).pack(anchor="w", pady=(10,2))
+        decisiones = []
+        for i in range(n):
+            # filtramos solo las decisiones que realmente existen
+            acciones = [
+                k for k in range(self.n_decisiones)
+                if any(abs(self.Pij[k][i][j])>1e-6 for j in range(n))
+                or abs(self.Cik[k][i])>1e-6
+            ]
+            # si no hay ninguna, dejamos V[i] = 0 y decisión = 1
+            if not acciones:
+                tk.Label(
+                    scrollable,
+                    text=f"Estado {i}: sin acciones → V¹[{i}] = 0.0000",
+                    font=("Arial",16),
+                    fg="black",
+                    bg="#DCDAD6"
+                ).pack(anchor="w")
+                
+                V[i] = 0.0
+                decisiones.append(1)
+                continue
+
+            # buscamos min Cik
+            costos = [(self.Cik[k][i], k+1) for k in acciones]
+            c_min, k_min = min(costos, key=lambda x: x[0])
+            V[i] = c_min
+            decisiones.append(k_min)
+            for c,kp in costos:
+                # crea un Frame para la línea completa
+                line_frame = tk.Frame(scrollable, bg="#DCDAD6")
+                line_frame.pack(anchor="w", pady=(0,5))
+                tk.Label(
+                    line_frame,
+                    text=f"Estado {i}   ",
+                    font=("Arial",17, "bold"),
+                    fg="black",
+                    bg="#DCDAD6"
+                ).pack(side="left")
+                tk.Label(
+                    line_frame,
+                    text=f"k= {kp}:   ",
+                    font=("Arial",17, "italic"),
+                    fg="black",
+                    bg="#DCDAD6"
+                ).pack(side="left")
+                tk.Label(
+                    line_frame,
+                    text=f" C={c:.2f}",
+                    font=("Arial",16, "italic", "bold"),
+                    fg="#074A37",
+                    bg="#DCDAD6"
+                ).pack(side="left")
+                
+            tk.Label(
+                scrollable,
+                text=f"→ V¹[{i}] = {c_min:.4f}   d¹[{i}] = {k_min}",
+                font=("Arial",16,"italic"),
+                fg="#168aad",
+                bg="#DCDAD6"
+            ).pack(anchor="w", pady=(1))
+
+        tk.Label(
+            scrollable,
+            text="V = [" + ", ".join(f"{v:.4f}" for v in V) + "]",
+            font=("Arial",18, "bold"),
+            fg="#25a244",
+            bg="#DCDAD6"
+        ).pack(anchor="w")
+
+        # --- Paso 2: iteraciones 2..N ---
+        for t in range(2, N+1):
+            Vprev = V.copy()
+            Vnew = np.zeros(n)
+
+            tk.Label(
+                scrollable,
+                text=f"\n                    Iteración {t}",
+                font=("Arial",20,"bold"),
+                fg="#2a9d8f",
+                bg="#DCDAD6"
+            ).pack(anchor="w", pady=(10,2))
+
+            nuevas_dec = []
+            for i in range(n):
+                acciones = [
+                    k for k in range(self.n_decisiones)
+                    if any(abs(self.Pij[k][i][j])>1e-6 for j in range(n))
+                    or abs(self.Cik[k][i])>1e-6
+                ]
+                if not acciones:
+                    tk.Label(
+                        scrollable,
+                        text=f"Estado {i}: sin acciones → Vᵗ[{i}] = {Vprev[i]:.4f}",
+                        font=("Arial",16),
+                        fg="black",
+                        bg="#DCDAD6"
+                    ).pack(anchor="w")
+                    Vnew[i] = Vprev[i]
+                    nuevas_dec.append(decisiones[i])
+                    continue
+
+                mejor_Q, mejor_k = None, None
+                for k in acciones:
+                    ci = self.Cik[k][i]
+                    suma_pv = sum(self.Pij[k][i][j] * Vprev[j] for j in range(n))
+                    Q = ci + alpha * suma_pv
+                    # crea un Frame para la línea completa
+                    line_frame = tk.Frame(scrollable, bg="#DCDAD6")
+                    line_frame.pack(anchor="w", pady=(0,5))
+                    
+                    # fragmento 1: "Estado i, k=..."
+                    tk.Label(
+                        line_frame,
+                        text=f"Estado {i}   ",
+                        font=("Arial",17, "bold"),
+                        fg="black",
+                        bg="#DCDAD6"
+                    ).pack(side="left")
+                    tk.Label(
+                        line_frame,
+                        text=f" k={k+1}:    ",
+                        font=("Arial",17, "italic"),
+                        fg="black",
+                        bg="#DCDAD6"
+                    ).pack(side="left")
+                    
+
+                    # fragmento 2: "ci + "
+                    tk.Label(
+                        line_frame,
+                        text=f"{ci:.2f} + {alpha}*({suma_pv:.4f}",
+                        font=("Arial",16),
+                        fg="#889696",
+                        bg="#DCDAD6"
+                    ).pack(side="left")
+
+                    # fragmento 4: " = Q"
+                    tk.Label(
+                        line_frame,
+                        text=f" = {Q:.4f}",
+                        font=("Arial",16, "italic", "bold"),
+                        fg="#074A37",
+                        bg="#DCDAD6"
+                    ).pack(side="left")
+                    if mejor_Q is None or Q < mejor_Q:
+                        mejor_Q, mejor_k = Q, k+1
+                Vnew[i] = mejor_Q
+                nuevas_dec.append(mejor_k)
+                tk.Label(
+                    scrollable,
+                    text=f"→ Vᵗ[{i}] = {mejor_Q:.4f}   dᵗ[{i}] = {mejor_k}",
+                    font=("Arial",16,"italic"),
+                    fg="#168aad",
+                    bg="#DCDAD6"
+                ).pack(anchor="w", pady=(0,5))
+
+            tk.Label(
+                scrollable,
+                text="V = [" + ", ".join(f"{v:.4f}" for v in Vnew) + "]",
+                font=("Arial",18, "bold"),
+                fg="#25a244",
+                bg="#DCDAD6"
+            ).pack(anchor="w")
+
+            # comprobación de tolerancia
+            diff = np.max(np.abs(Vnew - Vprev))
+            if diff <= epsilon:
+                tk.Label(
+                    scrollable,
+                    text=f"\nConvergió en iteración {t} (diff={diff:.6f}).",
+                    font=("Arial",16,"italic"),
+                    fg="#e76f51",
+                    bg="#DCDAD6"
+                ).pack(anchor="w", pady=(10,2))
+                V = Vnew
+                decisiones = nuevas_dec
+                break
+
+            V = Vnew
+            decisiones = nuevas_dec
+
+        # --- Resultado final de la política ---
+        tk.Label(
+            scrollable,
+            text="\n--- Política Óptima ---",
+            font=("Arial",20,"bold"),
+            fg="#2a9d8f",
+            bg="#DCDAD6"
+        ).pack(anchor="w", pady=(10,2))
+        for i,k in enumerate(decisiones):
+            line_frame = tk.Frame(scrollable, bg="#DCDAD6")
+            line_frame.pack(anchor="w", pady=(0,5))
+            tk.Label(
+                line_frame,
+                text=f"Estado {i}: ",
+                font=("Arial", 18, "bold"),
+                fg="black",
+                bg="#DCDAD6"
+            ).pack(side="left")
+
+            # Parte "k* = "
+            tk.Label(
+                line_frame,
+                text="k* = ",
+                font=("Arial", 18, "italic"),
+                fg="#555555",     # gris oscuro
+                bg="#DCDAD6"
+            ).pack(side="left")
+
+            # Parte del valor k
+            tk.Label(
+                line_frame,
+                text=str(k),
+                font=("Arial", 30, "bold"),
+                fg="#2a9d8f",     # verde destacable
+                bg="#DCDAD6"
+            ).pack(side="left")
+
+        # botón de regreso
+        btn_frame = ttk.Frame(self.root, padding=10)
+        btn_frame.pack(fill="x")
+        ttk.Button(
+            btn_frame,
+            text="Volver al menú",
+            style='Azul.TButton',
+            command=self.inicio
+        ).pack(pady=10)
 
 
+    
+    
+    
 # Punto de entrada principal
 if __name__ == "__main__":
     root = tk.Tk()
