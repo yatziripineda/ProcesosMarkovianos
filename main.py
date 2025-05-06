@@ -1100,11 +1100,13 @@ class App:
             messagebox.showerror("Error", "Política inicial inválida.")
             return
 
+
         # Preguntar si se desea minimizar o maximizar
         modo = simpledialog.askstring("Modo", "¿Deseas minimizar o maximizar?\n(Escribe: minimizar o maximizar)")
         if not modo or modo.lower() not in ["min", "max"]:
             messagebox.showerror("Error", "Modo inválido. Escribe 'min' o 'max'.")
             return
+
 
         # --- Paso 1: Factor de descuento α ---
         alpha_str = simpledialog.askstring(
@@ -1123,7 +1125,9 @@ class App:
         self.root.configure(bg="#DCDAD6")
         for w in self.root.winfo_children():
             w.destroy()
+
         ttk.Label(self.root, text=f"Mejoramiento con Descuento ({modo})", font=("Arial",16,"bold"), background="#DCDAD6").pack(pady=10)
+
 
         container = tk.Frame(self.root, bg="#DCDAD6")
         container.pack(fill="both", expand=True, padx=20, pady=10)
@@ -1193,9 +1197,11 @@ class App:
                     Q = ci + alpha * suma_pv
                     detalle += (f"Estado {i}, k={k+1}: "
                                 f"{ci} + {alpha}*({round(suma_pv,3)}) = {round(Q,2)}\n")
+
                     if mejor_val is None or (modo.lower() == "min" and Q < mejor_val) or (modo.lower() == "max" and Q > mejor_val):
                         mejor_val, mejor_k = Q, k+1
                     
+
                 nueva.append(mejor_k)
                 detalle += f"→ Mejor decisión: k={mejor_k}\n"
 
