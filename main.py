@@ -954,6 +954,14 @@ class App:
     def resolver_ppl(self):
         for widget in self.root.winfo_children():
             widget.destroy()
+               
+        #Pregunta si minimizar o maximizar
+        modo = simpledialog.askstring("Modo de optimización", "¿Deseas minimizar o maximizar?\n(Escribe: min o max)")
+        if not modo or modo.lower() not in ["min", "max"]:
+            messagebox.showerror("Error", "Opción inválida. Debes escribir 'min' o 'max'.")
+            return
+#---------------
+
 
         tk.Label(self.root, text="Resolviendo con Programación Lineal", font=("Arial", 16)).pack(pady=10)
 
@@ -967,10 +975,12 @@ class App:
         b_eq = []   # Vector del lado derecho
         bounds = [(0, None)] * total_vars  # y_ik ≥ 0
 
-        # Creamos vector de costos C
+        # Función objetivo C:según modo
         for i in range(n):
             for k in range(m):
-                C.append(self.Cik[k][i])
+                c = self.Cik[k][i]
+                C.append(c if modo.lower() == "min" else -c)
+#_________
 
         # Restricción 1: suma de todas las y_ik = 1
         A_eq.append([1.0] * total_vars)
@@ -996,7 +1006,7 @@ class App:
         frame_modelo.pack(pady=5)
 
         # Función objetivo
-        z_texto = "Min z = "
+        z_texto = f"{'Max' if modo.lower() == 'max' else 'Min'} z = "
         for i in range(n):
             for k in range(m):
                 coef = round(self.Cik[k][i], 2)
@@ -1021,15 +1031,19 @@ class App:
             ecuacion = f"Estado {j}: {lhs} = y_{j}*"
             tk.Label(frame_modelo, text=ecuacion, font=("Courier", 10), anchor="w", justify="left").pack(anchor="w")
 
-
+        
 #---------------------
         # Resolver con scipy.optimize.linprog
         resultado = linprog(C, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method='highs')
 
+
         if resultado.success:
             y_vars = resultado.x
             costo_optimo = resultado.fun
-
+            #Corrige el resultado para que no sea negativo si max
+            if modo.lower() == "max":
+                costo_optimo *= -1
+            #----
             # Mostrar el costo óptimo
             tk.Label(self.root, text=f"Costo óptimo total: {round(costo_optimo, 4)}", font=("Arial", 14)).pack(pady=10)
 
@@ -1043,17 +1057,18 @@ class App:
 
             for i in range(n):
                 mejor_k = -1
-                valor_max = 0
+                mayor_yik = -1
                 fila = f"Estado {i}: "
                 for k in range(m):
                     idx = i * m + k
                     y_val = round(y_vars[idx], 4)
                     fila += f" y_{i}{k}={y_val}   "
-                    if y_val > valor_max:
-                        valor_max = y_val
+                    if y_val > mayor_yik:
+                        mayor_yik = y_val
                         mejor_k = k
                 politica_optima.append(mejor_k + 1)
                 texto += fila + "\n"
+
 
             tk.Label(frame, text=texto, font=("Courier", 10), justify="left", anchor="w").pack()
 
@@ -1085,6 +1100,14 @@ class App:
             messagebox.showerror("Error", "Política inicial inválida.")
             return
 
+
+        # Preguntar si se desea minimizar o maximizar
+        modo = simpledialog.askstring("Modo", "¿Deseas minimizar o maximizar?\n(Escribe: minimizar o maximizar)")
+        if not modo or modo.lower() not in ["min", "max"]:
+            messagebox.showerror("Error", "Modo inválido. Escribe 'min' o 'max'.")
+            return
+
+
         # --- Paso 1: Factor de descuento α ---
         alpha_str = simpledialog.askstring(
             "Factor de descuento",
@@ -1102,8 +1125,9 @@ class App:
         self.root.configure(bg="#DCDAD6")
         for w in self.root.winfo_children():
             w.destroy()
-        ttk.Label(self.root, text="Mejoramiento con Descuento",
-                font=("Arial",16,"bold"), background="#DCDAD6").pack(pady=10)
+
+        ttk.Label(self.root, text=f"Mejoramiento con Descuento ({modo})", font=("Arial",16,"bold"), background="#DCDAD6").pack(pady=10)
+
 
         container = tk.Frame(self.root, bg="#DCDAD6")
         container.pack(fill="both", expand=True, padx=20, pady=10)
@@ -1173,8 +1197,11 @@ class App:
                     Q = ci + alpha * suma_pv
                     detalle += (f"Estado {i}, k={k+1}: "
                                 f"{ci} + {alpha}*({round(suma_pv,3)}) = {round(Q,2)}\n")
-                    if mejor_val is None or Q < mejor_val:
+
+                    if mejor_val is None or (modo.lower() == "min" and Q < mejor_val) or (modo.lower() == "max" and Q > mejor_val):
                         mejor_val, mejor_k = Q, k+1
+                    
+
                 nueva.append(mejor_k)
                 detalle += f"→ Mejor decisión: k={mejor_k}\n"
 
