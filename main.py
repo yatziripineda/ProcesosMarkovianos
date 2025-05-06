@@ -70,11 +70,13 @@ class App:
         # --- Sección: Ejercicios prueba ---
         data_frame = ttk.LabelFrame(self.root, text="Ejercicios prueb", padding=10)
         data_frame.pack(padx=20, pady=10, fill='x')
-        ttk.Button(data_frame, text="Cargar ejemplo", width=25, command=self.cargar_ejemplo_datos)\
+        ttk.Button(data_frame, text="Cargar ejemplo", width=20, command=self.cargar_ejemplo_datos)\
             .pack(side='left', padx=5, pady=5)
-        ttk.Button(data_frame, text="Ejemplo de tarea_1", width=25, command=self.cargar_ejemplo_datos_Tarea1)\
+        ttk.Button(data_frame, text="Ejemplo de tarea_1", width=20, command=self.cargar_ejemplo_datos_Tarea1)\
             .pack(side='left', padx=5, pady=5)
-        ttk.Button(data_frame, text="Ejemplo de tarea_2", width=25, command=self.cargar_ejemplo_datos_Tarea)\
+        ttk.Button(data_frame, text="Ejemplo de tarea_2", width=20, command=self.cargar_ejemplo_datos_Tarea)\
+            .pack(side='left', padx=5, pady=5)
+        ttk.Button(data_frame, text="Ejemplo de tarea_2_max", width=20, command=self.cargar_ejemplo_datos_Tarea_Max)\
             .pack(side='left', padx=5, pady=5)
 
         # --- Sección: Algoritmos disponibles ---
@@ -485,6 +487,44 @@ class App:
         messagebox.showinfo(
             "Datos cargados de la práctica",
             "Se cargaron los datos de la práctica correctamente.\nAhora puedes ejecutar los algoritmos."
+        )
+
+    def cargar_ejemplo_datos_Tarea_Max(self):
+        # 1) Número de estados y decisiones
+        self.n_estados = 3
+        self.n_decisiones = 3
+
+        # 2) Probabilidades de transición Pij[decisión][estado][estado_siguiente]
+        self.Pij = [
+            [  # Decisión 0: Radio
+                [0.4, 0.5, 0.1],
+                [0.1, 0.7, 0.2],
+                [0.1, 0.2, 0.7]
+            ],
+            [  # Decisión 1: TV
+                [0.7, 0.2, 0.1],
+                [0.3, 0.6, 0.1],
+                [0.1, 0.7, 0.2]
+            ],
+            [  # Decisión 2: Periódico
+                [0.2, 0.5, 0.3],
+                [0.0, 0.7, 0.3],
+                [0.0, 0.2, 0.8]
+            ]
+        ]
+
+        # 3) Ingresos inmediatos Cik (se invierte el signo para maximizar al minimizar)
+        # done: datos modificados para maximización
+        self.Cik = [
+            [-280, -250, -220],   # Radio
+            [-220, -110,  130],   # TV
+            [-258, -255, -300]    # Periódico
+        ]
+
+        # 4) Confirmación al usuario
+        messagebox.showinfo(
+            "Datos cargados de la práctica",
+            "Se cargaron los datos de la práctica correctamente.\nAhora puedes ejecutar los algoritmos (maximizando ingresos)."
         )
 
 
@@ -1088,7 +1128,6 @@ class App:
         entrada = simpledialog.askstring(
             "Política inicial",
             f"Escribe la política inicial R de {self.n_estados} valores (1 a {self.n_decisiones}, separados por espacio):"
-
         )
         if not entrada:
             return
@@ -1174,18 +1213,16 @@ class App:
             tk.Label(scrollable, text=sol_text, font=("Arial",16), fg="black", bg="#DCDAD6", justify="left")\
                 .pack(anchor="w", pady=5)
 
-            # --- Paso 3: Mejora de política ignorando decisiones con Pij[k][i] toda ceros ---
+            # --- Paso 3: Mejora de política ---
             detalle = f"Detalle mejora con α (Iter {iteracion}):\n"
             nueva = []
             for i in range(n):
-                # Encuentro qué decisiones k tienen Pij[k][i] no todas ceros o un costo distinto de 0
                 acciones = [
                     k for k in range(self.n_decisiones)
                     if any(abs(self.Pij[k][i][j])>1e-6 for j in range(n))
                     or abs(self.Cik[k][i])>1e-6
                 ]
                 if not acciones:
-                    # Si ninguna decisión aplica (fila cero en todas), conservo la actual
                     detalle += f"Estado {i}: sin transiciones válidas → conservo k={politica[i]}\n"
                     nueva.append(politica[i])
                     continue
@@ -1208,7 +1245,6 @@ class App:
             tk.Label(scrollable, text=detalle, font=("Arial",16), fg="black", bg="#DCDAD6", justify="left")\
                 .pack(anchor="w", pady=5)
 
-            # Mostrar política nueva
             tk.Label(scrollable,
                     text=f"Política nueva (Iter {iteracion}): {nueva}",
                     font=("Arial",16,"bold"), fg="#2a9d8f", bg="#DCDAD6")\
