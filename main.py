@@ -284,19 +284,19 @@ class App:
         inner = ttk.Frame(btn_frame)
         inner.pack()
 
-        ttk.Button(
-            inner,
-            text="Corregir datos",
-            style='Azul.TButton',
-            command= self.guardar_decision
-        ).pack(side='left', padx=10)
+        
         ttk.Button(
             inner,
             text="Volver al menú",
             style='Azul.TButton',
             command=self.inicio
         ).pack(side='left', padx=10)
-
+        ttk.Button(
+            inner,
+            text="Guardar datos",
+            style='Azul.TButton',
+            command= self.guardar_decision
+        ).pack(side='left', padx=10)
 
     def guardar_decision(self):
         # Guardamos lo ingresado para esta decisión
