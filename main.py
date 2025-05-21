@@ -62,10 +62,12 @@ class App:
         # --- Sección: Lectura de datos ---
         data_frame = ttk.LabelFrame(self.root, text="Lectura de datos", padding=10)
         data_frame.pack(padx=20, pady=10, fill='x')
-        ttk.Button(data_frame, text="Leer datos", width=40, command=self.abrir_lectura_datos)\
+        ttk.Button(data_frame, text="Leer datos", width=30, command=self.abrir_lectura_datos)\
             .pack(side='left', padx=5, pady=5)
-        ttk.Button(data_frame, text="Mostrar datos", width=40, command=self.mostrar_datos_ingresados)\
+        ttk.Button(data_frame, text="Mostrar datos", width=30, command=self.mostrar_datos_ingresados)\
             .pack(side='left', padx=5, pady=5)
+        ttk.Button(data_frame, text="Editar matrices", width=30, command=self.editar_matrices)\
+            .pack(side='left', padx=5, pady=5)  # done: botón independiente para editar Pij y Cik
             
         # --- Sección: Ejercicios prueba ---
         data_frame = ttk.LabelFrame(self.root, text="Ejercicios prueb", padding=10)
@@ -1380,7 +1382,11 @@ class App:
 
             # buscamos min Cik
             costos = [(self.Cik[k][i], k+1) for k in acciones]
-            c_min, k_min = min(costos, key=lambda x: x[0])
+            if modo.lower() == "min":
+                c_min, k_min = min(costos, key=lambda x: x[0])
+            else:
+                c_min, k_min = max(costos, key=lambda x: x[0])
+
             V[i] = c_min
             decisiones.append(k_min)
             for c,kp in costos:
@@ -1584,6 +1590,83 @@ class App:
             style='Azul.TButton',
             command=self.inicio
         ).pack(pady=10)
+        
+        
+    def editar_matrices(self):
+        # done: validar que hay datos leídos
+        if not hasattr(self, 'Pij'):
+            messagebox.showerror("Error", "No hay datos cargados para editar.")
+            return
+
+        # crea ventana modal
+        editor = tk.Toplevel(self.root)
+        editor.title("Editar matrices Pij y Cik")
+        editor.geometry("800x600")
+        editor.transient(self.root)
+
+        # scrollable container
+        cont = tk.Frame(editor)
+        cont.pack(fill='both', expand=True)
+        canvas = tk.Canvas(cont)
+        vsb = ttk.Scrollbar(cont, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        frame = tk.Frame(canvas)
+        canvas.create_window((0,0), window=frame, anchor="nw")
+        frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+        # guardamos referencias a los Entry
+        entradas_pij = []
+        entradas_cik = []
+
+        # creamos la grilla de entradas
+        for k in range(self.n_decisiones):
+            tk.Label(frame, text=f"Decisión {k+1}", font=("Arial", 14, "bold")).grid(row= k*(self.n_estados+2), column=0, pady=(10,0), columnspan=self.n_estados+2, sticky='w')
+            # encabezados de Pij
+            for j in range(self.n_estados):
+                tk.Label(frame, text=f"j={j}").grid(row=k*(self.n_estados+2)+1, column=j+1)
+            pij_rows = []
+            for i in range(self.n_estados):
+                tk.Label(frame, text=f"i={i}").grid(row=k*(self.n_estados+2)+2+i, column=0)
+                row_entries = []
+                for j in range(self.n_estados):
+                    e = tk.Entry(frame, width=6, justify="center")
+                    e.grid(row=k*(self.n_estados+2)+2+i, column=j+1, padx=2, pady=2)
+                    e.insert(0, str(self.Pij[k][i][j]))  # done: prefill Pij
+                    row_entries.append(e)
+                pij_rows.append(row_entries)
+                # Cik al final de la fila
+                e_c = tk.Entry(frame, width=6, justify="center")
+                e_c.grid(row=k*(self.n_estados+2)+2+i, column=self.n_estados+2, padx=10)
+                e_c.insert(0, str(self.Cik[k][i]))    # done: prefill Cik
+                entradas_cik.append((k, i, e_c))
+            entradas_pij.append((k, pij_rows))
+
+        # botones Guardar y Cancelar
+        btn_frame = ttk.Frame(editor, padding=10)
+        btn_frame.pack(fill='x', side='bottom')
+        def guardar():
+            # recorremos y actualizamos self.Pij y self.Cik
+            for k, rows in entradas_pij:
+                for i, row in enumerate(rows):
+                    for j, entry in enumerate(row):
+                        try:
+                            self.Pij[k][i][j] = float(entry.get())
+                        except:
+                            messagebox.showerror("Error", f"Valor inválido en Pij[{k}][{i}][{j}]")
+                            return
+            for k, i, entry in entradas_cik:
+                try:
+                    self.Cik[k][i] = float(entry.get())
+                except:
+                    messagebox.showerror("Error", f"Valor inválido en Cik[{k}][{i}]")
+                    return
+            messagebox.showinfo("Listo", "Matrices actualizadas correctamente.")
+            editor.destroy()
+
+        ttk.Button(btn_frame, text="Guardar cambios", command=guardar).pack(side='left', padx=20)
+        ttk.Button(btn_frame, text="Cancelar", command=editor.destroy).pack(side='right', padx=20)
 
 
     
